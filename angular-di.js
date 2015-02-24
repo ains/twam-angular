@@ -1,20 +1,13 @@
-function Injector() {
-    this.modules = {};
+var Injector = function() {
+    this.dependencies = {};
     this.singletons = {};
 
-    this.addModule = function (moduleName, injectables) {
-        this.modules[moduleName] = injectables;
-    };
-
-    this.getSingleton = function (moduleName) {
-        if (!(moduleName in this.singletons)) {
-            this.singletons[moduleName] = this.invoke(this.modules[moduleName]);
-        }
-        return this.singletons[moduleName];
+    this.addDependency = function (dependencyName, injectables) {
+        this.dependencies[dependencyName] = injectables;
     };
 
     this.resolveDependency = function (moduleName) {
-        if (this.modules[moduleName]) {
+        if (moduleName in this.dependencies) {
             return this.getSingleton(moduleName);
         } else {
             throw new Error("Dependency " + moduleName +
@@ -22,38 +15,55 @@ function Injector() {
         }
     };
 
-    this.invoke = function (injectables) {
-        // Last item in the list is the module function
-        var fn = injectables.pop();
 
-        // pop modifies the list - "injectables" now only contains dependencies
+    this.getSingleton = function (dependencyName) {
+        if (!(dependencyName in this.singletons)) {
+            // No instance exists for this singleton, create it now.
+            this.singletons[dependencyName] = this.invoke(this.dependencies[dependencyName]);
+        }
+        return this.singletons[dependencyName];
+    };
+
+
+    this.invoke = function (injectables) {
         // Map to convert dependencies from strings into the singleton object
-        var dependencies = injectables.map(this.resolveDependency, this);
+        var dependencies = injectables.slice(0, -1).map(this.resolveDependency, this);
+
+        // Last item in the list is the module function
+        var fn = injectables[injectables.length -1];
 
         // Create singleton object for this module
         // By calling the module function with all dependencies
-        // Store singleton in loaded module
         return fn.apply(null, dependencies);
     }
-}
+};
 
-function NotAngular() {
-    this.injector = new Injector();
+var Module = function(moduleName, dependencies) {
+    this.$injector = new Injector();
 
+    this.service = function (serviceName, dependencies) {
+        this.$injector.addDependency(serviceName, dependencies);
 
-    this.module = function (moduleName, declaration) {
-        this.injector.addModule(moduleName, declaration);
         return this;
     };
 
     this.run = function (injectables) {
-        this.injector.invoke(injectables);
+        this.$injector.invoke(injectables);
+
+        return this;
     }
+};
+
+function NotAngular() {
+    this.module = function (moduleName, dependencies) {
+        return new Module(moduleName, dependencies);
+    };
 }
 
 var angular = new NotAngular();
+var module = angular.module('testModule', []);
 
-angular.module('$http', [function () {
+module.service('$http', [function () {
     return {
         get: function (url) {
             return "Got data from: " + url;
@@ -61,12 +71,14 @@ angular.module('$http', [function () {
     }
 }]);
 
-angular.module('testModule', ['$http', function ($http) {
+module.service('dummyService', ['$http', function ($http) {
     return {
         fetchJson: function () {
             return $http.get("example.json");
         }
     }
-}]).run(['testModule', function (testModule) {
-    console.log(testModule.fetchJson());
+}]);
+
+module.run(['dummyService', function (dummyService) {
+    console.log(dummyService.fetchJson());
 }]);
