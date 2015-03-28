@@ -1,4 +1,4 @@
-var Injector = function() {
+var Injector = function () {
     this.dependencies = {};
     this.singletons = {};
 
@@ -24,21 +24,35 @@ var Injector = function() {
         return this.singletons[dependencyName];
     };
 
+    this.extractArguments = function (fn) {
+        var FN_ARGS = /^function\s*[^\(]*\(\s*([^\)]*)\)/m;
+        var FN_ARG_SPLIT = /,/;
 
-    this.invoke = function (injectables) {
-        // Map to convert dependencies from strings into the singleton object
-        var dependencies = injectables.slice(0, -1).map(this.resolveDependency, this);
+        var argString = fn.toString().match(FN_ARGS);
 
-        // Last item in the list is the module function
-        var fn = injectables[injectables.length -1];
+        return argString[1].split(FN_ARG_SPLIT);
+    };
+
+
+    this.invoke = function (definition) {
+        var dependencies, fn;
+        if (typeof definition === 'function') {
+            fn = definition;
+            dependencies = this.extractArguments(fn);
+        } else {
+            // Map to convert dependencies from strings into the singleton object
+            dependencies = definition.slice(0, -1);
+            // Last item in the list is the module function
+            fn = definition[definition.length - 1];
+        }
 
         // Create singleton object for this module
         // By calling the module function with all dependencies
-        return fn.apply(null, dependencies);
+        return fn.apply(null, dependencies.map(this.resolveDependency, this));
     }
 };
 
-var Module = function(moduleName, dependencies) {
+var Module = function (moduleName, dependencies) {
     this.$injector = new Injector();
 
     this.service = function (serviceName, dependencies) {
@@ -71,13 +85,13 @@ module.service('$http', [function () {
     }
 }]);
 
-module.service('dummyService', ['$http', function ($http) {
+module.service('dummyService', function ($http) {
     return {
         fetchJson: function () {
             return $http.get("example.json");
         }
     }
-}]);
+});
 
 module.run(['dummyService', function (dummyService) {
     console.log(dummyService.fetchJson());
