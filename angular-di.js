@@ -37,12 +37,12 @@ var Injector = function () {
     this.invoke = function (definition) {
         var dependencies, fn;
         if (typeof definition === 'function') {
+            // Handling an implicit function notation
             fn = definition;
             dependencies = this.extractArguments(fn);
         } else {
-            // Map to convert dependencies from strings into the singleton object
+            // Handling Inline Array Notation
             dependencies = definition.slice(0, -1);
-            // Last item in the list is the module function
             fn = definition[definition.length - 1];
         }
 
@@ -68,11 +68,11 @@ var Module = function (moduleName, dependencies) {
     }
 };
 
-function NotAngular() {
+var NotAngular = function () {
     this.module = function (moduleName, dependencies) {
         return new Module(moduleName, dependencies);
     };
-}
+};
 
 var angular = new NotAngular();
 var module = angular.module('testModule', []);
